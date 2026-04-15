@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-navy: #0d1117;
+    --color-paper: #f5f0e8;
+    --color-saffron: #e8890c;
+    --color-sage: #6b8f71;
+    --color-ink: #1a1a2e;
+    --color-mist: #e8e8f0;
+
+    --font-serif: "Fraunces", serif;
+    --font-sans: "Inter", sans-serif;
+
+    --ease-breath: cubic-bezier(0.4, 0, 0.2, 1);
+    --duration-slow: 800ms;
+    --duration-medium: 400ms;
+    --duration-fast: 150ms;
+
+    /* Keep shadcn token aliases during migration. */
+    --background: 37 33% 94%;
+    --foreground: 240 27% 14%;
+
+    --card: 37 33% 94%;
+    --card-foreground: 240 27% 14%;
+
+    --popover: 37 33% 94%;
+    --popover-foreground: 240 27% 14%;
+
+    --primary: 35 90% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 21% 92%;
+    --secondary-foreground: 240 27% 14%;
+
+    --muted: 240 21% 92%;
+    --muted-foreground: 240 12% 30%;
+
+    --accent: 35 90% 48%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 240 21% 92%;
+    --input: 240 21% 92%;
+    --ring: 35 90% 48%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 37 33% 94%;
+
+    --sidebar-foreground: 240 27% 14%;
+
+    --sidebar-primary: 35 90% 48%;
+
+    --sidebar-primary-foreground: 0 0% 100%;
+
+    --sidebar-accent: 240 21% 92%;
+
+    --sidebar-accent-foreground: 240 27% 14%;
+
+    --sidebar-border: 240 21% 92%;
+
+    --sidebar-ring: 35 90% 48%;
+  }
+
+  .dark {
+    --background: 214 28% 7%;
+    --foreground: 37 33% 94%;
+
+    --card: 214 28% 7%;
+    --card-foreground: 37 33% 94%;
+
+    --popover: 214 28% 7%;
+    --popover-foreground: 37 33% 94%;
+
+    --primary: 35 90% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 12% 22%;
+    --secondary-foreground: 37 33% 94%;
+
+    --muted: 240 12% 22%;
+    --muted-foreground: 240 10% 70%;
+
+    --accent: 35 90% 48%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 240 12% 22%;
+    --input: 240 12% 22%;
+    --ring: 35 90% 48%;
+    --sidebar-background: 214 28% 7%;
+    --sidebar-foreground: 37 33% 94%;
+    --sidebar-primary: 35 90% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 12% 22%;
+    --sidebar-accent-foreground: 37 33% 94%;
+    --sidebar-border: 240 12% 22%;
+    --sidebar-ring: 35 90% 48%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    transition: background-color var(--duration-medium) var(--ease-breath), color var(--duration-medium) var(--ease-breath);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-serif);
+  }
+}
