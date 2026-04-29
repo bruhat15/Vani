@@ -38,3 +38,6 @@ replit.md
 # Temporary/cache files
 .cache/
 .vite/
+
+
+/docs
