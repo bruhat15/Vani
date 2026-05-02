@@ -1,0 +1,31 @@
+# LiveKit Agent SDK
+livekit>=1.0.0
+livekit-agents>=1.0.0
+livekit-plugins-silero>=1.0.0
+
+# ASR
+faster-whisper>=1.1.0
+
+# LLM
+groq>=0.12.0
+
+# TTS
+kokoro>=0.8.0
+
+# RAG / Supabase
+supabase>=2.10.0
+httpx>=0.27.0
+
+# Embeddings (for query embedding in RAG)
+onnxruntime>=1.19.0
+tokenizers>=0.20.0
+
+# Observability
+opentelemetry-api>=1.28.0
+opentelemetry-sdk>=1.28.0
+opentelemetry-exporter-otlp>=1.28.0
+
+# Utilities
+python-dotenv>=1.0.0
+numpy>=1.26.0
+pydantic>=2.10.0
