@@ -1,0 +1,19 @@
+# Copy this file to livekit.yaml on your server and replace the placeholders.
+
+port: 7880
+
+rtc:
+  udp_port: 7881
+  tcp_port: 7882
+  use_external_ip: true
+
+logging:
+  level: info
+
+room:
+  auto_create: true
+  empty_timeout: 300
+
+# Replace these with the values you generate on the server.
+keys:
+  REPLACE_WITH_API_KEY: REPLACE_WITH_API_SECRET

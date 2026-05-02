@@ -10,6 +10,7 @@ dist-ssr/
 .env.*
 !.env.example
 *.local
+livekit.yaml
 
 # Logs
 logs/
