@@ -17,4 +17,4 @@ COPY . ./
 
 EXPOSE 8080
 
-CMD ["python", "agent.py"]
+CMD ["python", "agent.py", "start"]
