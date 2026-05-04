@@ -26,9 +26,6 @@ from livekit.agents import AgentSession, JobContext, WorkerOptions, cli
 
 from config import load_config, ASRBackend, LLMBackend, TTSBackend
 from pipeline import VaniPipeline, PipelineContext, AudioChunk
-from providers.asr.whisper import WhisperASR
-from providers.llm.groq import GroqLLM
-from providers.tts.kokoro import KokoroTTS
 from telemetry import init_telemetry
 
 load_dotenv()
@@ -74,25 +71,31 @@ async def _build_pipeline() -> VaniPipeline:
     # ASR provider
     match _config.asr_backend:
         case ASRBackend.WHISPER:
+            from providers.asr.whisper import WhisperASR
             asr = WhisperASR(model_size=_config.whisper_model_size)
         case _:
             logger.warning(f"Unknown ASR backend '{_config.asr_backend}', falling back to Whisper")
+            from providers.asr.whisper import WhisperASR
             asr = WhisperASR(model_size=_config.whisper_model_size)
 
     # LLM provider
     match _config.llm_backend:
         case LLMBackend.GROQ:
+            from providers.llm.groq import GroqLLM
             llm = GroqLLM(api_key=_config.groq_api_key, model=_config.groq_model)
         case _:
             logger.warning(f"Unknown LLM backend '{_config.llm_backend}', falling back to Groq")
+            from providers.llm.groq import GroqLLM
             llm = GroqLLM(api_key=_config.groq_api_key, model=_config.groq_model)
 
     # TTS provider
     match _config.tts_backend:
         case TTSBackend.KOKORO:
+            from providers.tts.kokoro import KokoroTTS
             tts = KokoroTTS(voice=_config.tts_voice)
         case _:
             logger.warning(f"Unknown TTS backend '{_config.tts_backend}', falling back to Kokoro")
+            from providers.tts.kokoro import KokoroTTS
             tts = KokoroTTS(voice=_config.tts_voice)
 
     pipeline = VaniPipeline(
@@ -169,6 +172,14 @@ async def entrypoint(ctx: JobContext) -> None:
             asyncio.ensure_future(
                 _handle_audio_track(track, participant)
             )
+
+    async def _subscribe_existing_audio_tracks() -> None:
+        """Catch audio tracks that were published before event handlers were registered."""
+        for participant in ctx.room.remote_participants.values():
+            for publication in participant.track_publications.values():
+                if publication.kind == rtc.TrackKind.KIND_AUDIO and publication.track is not None:
+                    logger.info(f"Attaching to existing audio track from {participant.identity}")
+                    asyncio.ensure_future(_handle_audio_track(publication.track, participant))
 
     async def _handle_audio_track(
         track: rtc.Track, participant: rtc.RemoteParticipant
@@ -258,6 +269,7 @@ async def entrypoint(ctx: JobContext) -> None:
             asyncio.ensure_future(ctx.room.disconnect())
 
     logger.info("Agent ready and listening.")
+    await _subscribe_existing_audio_tracks()
     await asyncio.sleep(float("inf"))   # Keep alive
 
 
