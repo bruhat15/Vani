@@ -15,6 +15,7 @@ load_dotenv()
 
 class ASRBackend(str, Enum):
     WHISPER = "whisper"
+    GROQ_WHISPER = "groq_whisper"   # Groq-hosted whisper-large-v3-turbo (Phase 2)
     INDIC_CONFORMER = "indic_conformer"
 
 

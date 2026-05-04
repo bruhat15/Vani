@@ -71,13 +71,17 @@ async def _build_pipeline() -> VaniPipeline:
     """Instantiate and initialize the pipeline based on config."""
     # ASR provider
     match _config.asr_backend:
+        case ASRBackend.GROQ_WHISPER:
+            from providers.asr.groq_whisper import GroqWhisperASR
+            asr = GroqWhisperASR(api_key=_config.groq_api_key)
+            logger.info("Using Groq Whisper ASR (cloud, zero local RAM).")
         case ASRBackend.WHISPER:
             from providers.asr.whisper import WhisperASR
             asr = WhisperASR(model_size=_config.whisper_model_size)
         case _:
-            logger.warning(f"Unknown ASR backend '{_config.asr_backend}', falling back to Whisper")
-            from providers.asr.whisper import WhisperASR
-            asr = WhisperASR(model_size=_config.whisper_model_size)
+            logger.warning(f"Unknown ASR backend '{_config.asr_backend}', falling back to Groq Whisper")
+            from providers.asr.groq_whisper import GroqWhisperASR
+            asr = GroqWhisperASR(api_key=_config.groq_api_key)
 
     # LLM provider
     match _config.llm_backend:

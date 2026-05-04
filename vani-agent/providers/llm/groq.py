@@ -72,7 +72,7 @@ class GroqLLM(LLMProvider):
             model=self.model,
             messages=self._build_messages(messages),
             temperature=0.5,
-            max_tokens=300,      # Short answers for voice
+            max_tokens=120,      # ~2-3 spoken sentences. 300 caused 10-13s TTS synthesis.
         )
         elapsed_ms = (time.perf_counter() - t0) * 1000
         text = response.choices[0].message.content or ""
