@@ -74,11 +74,9 @@ class WhisperASR(ASRProvider):
                 audio,
                 beam_size=3,          # Reduced for lower latency (default is 5)
                 language=None,        # Auto-detect language
-                vad_filter=True,      # Filter out silence
-                vad_parameters=dict(
-                    min_silence_duration_ms=300,
-                    speech_pad_ms=100,
-                ),
+                vad_filter=False,     # MUST be False: LiveKit sends RED-encoded audio which
+                                      # Silero VAD misidentifies as silence, removing 100% of the
+                                      # buffer. We do our own silence filtering via min_audio_ms.
             )
             return list(segs), inf   # materialise the lazy generator inside the thread
 
