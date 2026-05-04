@@ -226,7 +226,8 @@ async def entrypoint(ctx: JobContext) -> None:
                     async def push_audio(chunk: AudioChunk):
                         """Push a synthesized audio chunk into the room."""
                         # Resample if needed (LiveKit typically wants 48kHz)
-                        samples_int16 = (chunk.samples * 32767).astype(np.int16)
+                        samples = chunk.samples.detach().cpu().numpy() if hasattr(chunk.samples, "detach") else np.asarray(chunk.samples)
+                        samples_int16 = (samples * 32767).astype(np.int16)
                         lk_frame = rtc.AudioFrame(
                             data=samples_int16.tobytes(),
                             sample_rate=chunk.sample_rate,
