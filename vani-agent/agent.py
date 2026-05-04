@@ -214,7 +214,11 @@ async def entrypoint(ctx: JobContext) -> None:
         # distinguishes actual speech from codec noise.
         silence_threshold = 0.03       # RMS below this = silence
         silence_frames = 0
-        silence_limit = 30             # ~600ms of silence at 20ms/frame = end of utterance
+        speech_frames = 0              # Track how much speech we've seen
+        # 1200ms silence = end of utterance. Increased from 600ms to handle
+        # natural mid-sentence pauses (e.g. "machine learning... is a type of AI")
+        # At 20ms/frame: 60 frames × 20ms = 1200ms
+        silence_limit = 60             # ~1200ms of silence = end of utterance
 
         # CRITICAL: LiveKit delivers audio at the track's native rate (Chrome = 48kHz).
         # We must pass the real rate to WhisperASR._ensure_16khz() so it resamples
@@ -244,6 +248,7 @@ async def entrypoint(ctx: JobContext) -> None:
             if rms > silence_threshold:
                 buffer.append(pcm)
                 silence_frames = 0
+                speech_frames += 1
             elif buffer:
                 silence_frames += 1
                 buffer.append(pcm)   # Include trailing silence for natural cut
@@ -253,6 +258,7 @@ async def entrypoint(ctx: JobContext) -> None:
                     audio_frames = np.concatenate(buffer)
                     buffer.clear()
                     silence_frames = 0
+                    speech_frames = 0
 
                     # Guard: skip clips too short for Whisper to transcribe reliably
                     if len(audio_frames) < min_audio_samples:
