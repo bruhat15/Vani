@@ -188,14 +188,24 @@ async def entrypoint(ctx: JobContext) -> None:
         nonlocal turn_index
         audio_stream = rtc.AudioStream(track)
         buffer: list[np.ndarray] = []
-        silence_threshold = 0.01       # RMS below this = silence
+        # LiveKit decodes audio to PCM; codec artifacts and background noise produce
+        # RMS ~0.005-0.015 even in silence. Setting threshold at 0.03 reliably
+        # distinguishes actual speech from codec noise.
+        silence_threshold = 0.03       # RMS below this = silence
         silence_frames = 0
-        silence_limit = 25             # ~500ms of silence at 20ms/frame = end of utterance
+        silence_limit = 30             # ~600ms of silence at 20ms/frame = end of utterance
+        min_audio_samples = 16000 * 1  # Minimum 1.5s of speech for Whisper to work reliably
+        # (16kHz * 1.5 = 24000 samples minimum)
+        min_audio_samples = 24000
+        sample_rate_hz = 16000         # Agent operates at 16kHz
+        frame_size = None              # Will be inferred from first frame
 
         async for event in audio_stream:
             frame: rtc.AudioFrame = event.frame
             # Convert to float32 numpy array
             pcm = np.frombuffer(frame.data, dtype=np.int16).astype(np.float32) / 32768.0
+            if frame_size is None:
+                frame_size = len(pcm)
 
             rms = float(np.sqrt(np.mean(pcm ** 2)))
 
@@ -211,6 +221,13 @@ async def entrypoint(ctx: JobContext) -> None:
                     audio_frames = np.concatenate(buffer)
                     buffer.clear()
                     silence_frames = 0
+
+                    # Guard: skip clips too short for Whisper to transcribe reliably
+                    if len(audio_frames) < min_audio_samples:
+                        logger.debug(
+                            f"Audio too short ({len(audio_frames)/sample_rate_hz*1000:.0f}ms) — skipping."
+                        )
+                        continue
 
                     resolved_user_id = user_id or participant.identity
                     context = PipelineContext(
