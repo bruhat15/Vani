@@ -23,6 +23,7 @@ from dotenv import load_dotenv
 
 from livekit import agents, rtc
 from livekit.agents import AgentSession, JobContext, WorkerOptions, cli
+from livekit.rtc.participant import PublishDataError
 
 from config import load_config, ASRBackend, LLMBackend, TTSBackend
 from pipeline import VaniPipeline, PipelineContext, AudioChunk
@@ -225,7 +226,6 @@ async def entrypoint(ctx: JobContext) -> None:
 
                     async def push_audio(chunk: AudioChunk):
                         """Push a synthesized audio chunk into the room."""
-                        # Resample if needed (LiveKit typically wants 48kHz)
                         samples = chunk.samples.detach().cpu().numpy() if hasattr(chunk.samples, "detach") else np.asarray(chunk.samples)
                         samples_int16 = (samples * 32767).astype(np.int16)
                         lk_frame = rtc.AudioFrame(
@@ -234,7 +234,10 @@ async def entrypoint(ctx: JobContext) -> None:
                             num_channels=1,
                             samples_per_channel=len(samples_int16),
                         )
-                        await audio_source.capture_frame(lk_frame)
+                        try:
+                            await audio_source.capture_frame(lk_frame)
+                        except Exception:
+                            pass  # Room may have closed mid-stream
 
                     async def send_transcript(user_text: str, agent_text: str):
                         """Send transcript to frontend via data channel."""
@@ -244,9 +247,14 @@ async def entrypoint(ctx: JobContext) -> None:
                             "user": user_text,
                             "agent": agent_text,
                         }).encode()
-                        await ctx.room.local_participant.publish_data(
-                            payload, reliable=True
-                        )
+                        try:
+                            await ctx.room.local_participant.publish_data(
+                                payload, reliable=True
+                            )
+                        except PublishDataError:
+                            pass  # Room closed before transcript could be sent
+                        except Exception as e:
+                            logger.debug(f"Transcript send skipped: {e}")
 
                     try:
                         await pipeline.process_turn(
