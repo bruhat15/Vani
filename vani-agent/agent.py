@@ -194,18 +194,29 @@ async def entrypoint(ctx: JobContext) -> None:
         silence_threshold = 0.03       # RMS below this = silence
         silence_frames = 0
         silence_limit = 30             # ~600ms of silence at 20ms/frame = end of utterance
-        min_audio_samples = 16000 * 1  # Minimum 1.5s of speech for Whisper to work reliably
-        # (16kHz * 1.5 = 24000 samples minimum)
-        min_audio_samples = 24000
-        sample_rate_hz = 16000         # Agent operates at 16kHz
-        frame_size = None              # Will be inferred from first frame
+
+        # CRITICAL: LiveKit delivers audio at the track's native rate (Chrome = 48kHz).
+        # We must pass the real rate to WhisperASR._ensure_16khz() so it resamples
+        # to 16kHz before transcription. Without this, Whisper hears speech at 3× speed.
+        actual_sample_rate: int = 48000   # safe default; updated from first frame
+        min_audio_samples: int = int(actual_sample_rate * 1.5)  # 1.5s minimum
+        frame_inited = False
 
         async for event in audio_stream:
             frame: rtc.AudioFrame = event.frame
+
+            # Capture real sample rate on first frame
+            if not frame_inited:
+                actual_sample_rate = frame.sample_rate
+                min_audio_samples = int(actual_sample_rate * 1.5)
+                logger.info(
+                    f"Audio stream: sample_rate={actual_sample_rate}Hz, "
+                    f"min_clip={min_audio_samples/actual_sample_rate:.1f}s"
+                )
+                frame_inited = True
+
             # Convert to float32 numpy array
             pcm = np.frombuffer(frame.data, dtype=np.int16).astype(np.float32) / 32768.0
-            if frame_size is None:
-                frame_size = len(pcm)
 
             rms = float(np.sqrt(np.mean(pcm ** 2)))
 
@@ -225,9 +236,10 @@ async def entrypoint(ctx: JobContext) -> None:
                     # Guard: skip clips too short for Whisper to transcribe reliably
                     if len(audio_frames) < min_audio_samples:
                         logger.debug(
-                            f"Audio too short ({len(audio_frames)/sample_rate_hz*1000:.0f}ms) — skipping."
+                            f"Audio too short ({len(audio_frames)/actual_sample_rate*1000:.0f}ms) — skipping."
                         )
                         continue
+
 
                     resolved_user_id = user_id or participant.identity
                     context = PipelineContext(
@@ -279,6 +291,7 @@ async def entrypoint(ctx: JobContext) -> None:
                             context=context,
                             on_audio=push_audio,
                             on_transcript=send_transcript,
+                            audio_sample_rate=actual_sample_rate,
                         )
                         logger.info(
                             f"Turn {turn_index} done | TTFA={context.ttfa_ms:.0f}ms"

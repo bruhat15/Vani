@@ -132,6 +132,7 @@ class VaniPipeline:
         on_audio: AudioOutputCallback,
         on_transcript: TranscriptCallback | None = None,
         on_citations: CitationCallback | None = None,
+        audio_sample_rate: int = 48000,   # Real sample rate from LiveKit (Chrome=48kHz)
     ) -> PipelineContext:
         """
         Process one complete voice turn: audio in → audio out.
@@ -152,7 +153,9 @@ class VaniPipeline:
 
         # ── Step 1: ASR ──────────────────────────────────────────────────
         logger.info("ASR: transcribing...")
-        asr_result: TranscriptionResult = await self.asr.transcribe(audio_frames)
+        asr_result: TranscriptionResult = await self.asr.transcribe(
+            audio_frames, sample_rate=audio_sample_rate
+        )
         context.t_asr_done = time.perf_counter()
         context.user_transcript = asr_result.text
         context.language = asr_result.language
