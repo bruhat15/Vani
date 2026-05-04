@@ -96,20 +96,29 @@ async def _build_pipeline() -> VaniPipeline:
     # TTS provider
     match _config.tts_backend:
         case TTSBackend.GOOGLE_TTS:
-            from providers.tts.google_tts import GoogleTTS
-            tts = GoogleTTS(
-                api_key=_config.google_tts_api_key,
-                voice=_config.google_tts_voice,
-                sample_rate=_config.google_tts_sample_rate,
-            )
-            logger.info(f"Using Google Cloud TTS (voice={_config.google_tts_voice}).")
+            if not _config.google_tts_api_key:
+                logger.warning(
+                    "GOOGLE_TTS_API_KEY not set — falling back to Kokoro TTS.\n"
+                    "  Add GOOGLE_TTS_API_KEY to /opt/n8n/.env to enable Google TTS (~200ms TTFA)."
+                )
+                from providers.tts.kokoro import KokoroTTS
+                tts = KokoroTTS(voice=_config.tts_voice)
+            else:
+                from providers.tts.google_tts import GoogleTTS
+                tts = GoogleTTS(
+                    api_key=_config.google_tts_api_key,
+                    voice=_config.google_tts_voice,
+                    sample_rate=_config.google_tts_sample_rate,
+                )
+                logger.info(f"Using Google Cloud TTS (voice={_config.google_tts_voice}).")
         case TTSBackend.KOKORO:
             from providers.tts.kokoro import KokoroTTS
             tts = KokoroTTS(voice=_config.tts_voice)
         case _:
-            logger.warning(f"Unknown TTS backend '{_config.tts_backend}', falling back to Google TTS")
-            from providers.tts.google_tts import GoogleTTS
-            tts = GoogleTTS(api_key=_config.google_tts_api_key, voice=_config.google_tts_voice)
+            logger.warning(f"Unknown TTS backend '{_config.tts_backend}', falling back to Kokoro")
+            from providers.tts.kokoro import KokoroTTS
+            tts = KokoroTTS(voice=_config.tts_voice)
+
 
     pipeline = VaniPipeline(
         asr=asr,
