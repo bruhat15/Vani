@@ -68,11 +68,7 @@ class WhisperASR(ASRProvider):
             audio,
             beam_size=3,          # Reduced for lower latency (default is 5)
             language=None,        # Auto-detect language
-            vad_filter=True,      # Filter out silence
-            vad_parameters=dict(
-                min_silence_duration_ms=300,
-                speech_pad_ms=100,
-            ),
+            vad_filter=False,     # Preserve all user audio for now; VAD is too aggressive here.
         )
         text = " ".join(seg.text for seg in segments).strip()
         duration_ms = (time.perf_counter() - t0) * 1000
