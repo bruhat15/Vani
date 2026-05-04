@@ -26,6 +26,7 @@ class LLMBackend(str, Enum):
 
 class TTSBackend(str, Enum):
     KOKORO = "kokoro"
+    GOOGLE_TTS = "google_tts"    # Google Cloud TTS Neural2 — ~200ms, 1M chars/month free
     INDIC_F5 = "indic_f5"
 
 
@@ -38,9 +39,9 @@ class VaniConfig(BaseModel):
     livekit_api_secret: str = Field(default_factory=lambda: os.getenv("LIVEKIT_API_SECRET", ""))
 
     # --- Provider selection ---
-    asr_backend: ASRBackend = Field(default_factory=lambda: ASRBackend(os.getenv("ASR_BACKEND", "whisper")))
+    asr_backend: ASRBackend = Field(default_factory=lambda: ASRBackend(os.getenv("ASR_BACKEND", "groq_whisper")))
     llm_backend: LLMBackend = Field(default_factory=lambda: LLMBackend(os.getenv("LLM_BACKEND", "groq")))
-    tts_backend: TTSBackend = Field(default_factory=lambda: TTSBackend(os.getenv("TTS_BACKEND", "kokoro")))
+    tts_backend: TTSBackend = Field(default_factory=lambda: TTSBackend(os.getenv("TTS_BACKEND", "google_tts")))
 
     # --- ASR settings ---
     whisper_model_size: str = Field(default_factory=lambda: os.getenv("WHISPER_MODEL_SIZE", "base"))
@@ -61,6 +62,10 @@ class VaniConfig(BaseModel):
     )
     tts_voice: str = Field(default_factory=lambda: os.getenv("TTS_VOICE", "af_heart"))
     tts_sample_rate: int = Field(default_factory=lambda: int(os.getenv("TTS_SAMPLE_RATE", "24000")))
+    # Google Cloud TTS
+    google_tts_api_key: str = Field(default_factory=lambda: os.getenv("GOOGLE_TTS_API_KEY", ""))
+    google_tts_voice: str = Field(default_factory=lambda: os.getenv("GOOGLE_TTS_VOICE", "en-US-Neural2-F"))
+    google_tts_sample_rate: int = Field(default_factory=lambda: int(os.getenv("GOOGLE_TTS_SAMPLE_RATE", "24000")))
 
     # --- RAG / Supabase ---
     supabase_url: str = Field(default_factory=lambda: os.getenv("SUPABASE_URL", ""))
