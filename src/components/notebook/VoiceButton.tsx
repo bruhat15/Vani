@@ -101,11 +101,6 @@ const VoiceButton = () => {
       return;
     }
 
-    if (voiceStatus === 'listening') {
-      setVoiceStatus('speaking');
-      return;
-    }
-
     setVoiceStatus('idle');
   };
 

@@ -150,6 +150,8 @@ const ChatArea = ({
   const latestMessageRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const triggerCitationHighlight = useVaniAppStore((state) => state.triggerCitationHighlight);
+  const voiceStatus = useVaniAppStore((state) => state.voiceStatus);
+  const isVoiceRoomActive = voiceStatus !== 'idle';
 
   const getSpeechRecognitionConstructor = (): SpeechRecognitionConstructor | null => {
     const speechWindow = window as Window & {
@@ -302,6 +304,11 @@ const ChatArea = ({
   const toggleSpeechInput = () => {
     if (!isSpeechInputSupported) {
       setSpeechError('Voice input is not supported in this browser.');
+      return;
+    }
+
+    if (isVoiceRoomActive) {
+      setSpeechError('Voice room is active. Turn it off to use speech input here.');
       return;
     }
 
@@ -463,7 +470,7 @@ const ChatArea = ({
                   variant="outline"
                   size="icon"
                   onClick={toggleSpeechInput}
-                  disabled={isChatDisabled || isSending || !!pendingUserMessage}
+                  disabled={isChatDisabled || isSending || !!pendingUserMessage || isVoiceRoomActive}
                   aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
                 >
                   {isListening ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
@@ -476,7 +483,7 @@ const ChatArea = ({
                     onChange={e => setMessage(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && !isChatDisabled && !isSending && !pendingUserMessage && handleSendMessage()}
                     className="pr-12"
-                    disabled={isChatDisabled || isSending || !!pendingUserMessage}
+                    disabled={isChatDisabled || isSending || !!pendingUserMessage || isVoiceRoomActive}
                   />
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500 dark:text-slate-400">
                     {sourceCount} source{sourceCount !== 1 ? 's' : ''}

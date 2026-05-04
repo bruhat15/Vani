@@ -9,6 +9,8 @@ import SourcesSidebar from '@/components/notebook/SourcesSidebar';
 import ChatArea from '@/components/notebook/ChatArea';
 import StudioSidebar from '@/components/notebook/StudioSidebar';
 import MobileNotebookTabs from '@/components/notebook/MobileNotebookTabs';
+import VoiceButton from '@/components/notebook/VoiceButton';
+import VoiceRoom from '@/components/notebook/VoiceRoom';
 import { Citation } from '@/types/message';
 import { useVaniAppStore } from '@/stores/appStore';
 
@@ -43,7 +45,9 @@ const Notebook = () => {
   };
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+    <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
+      <VoiceRoom notebookId={notebookId} />
+      <VoiceButton />
       <NotebookHeader 
         title={notebook?.title || 'Untitled Notebook'} 
         notebookId={notebookId} 
