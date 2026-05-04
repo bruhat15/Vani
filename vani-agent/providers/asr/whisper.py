@@ -73,7 +73,9 @@ class WhisperASR(ASRProvider):
             segs, inf = self._model.transcribe(
                 audio,
                 beam_size=3,          # Reduced for lower latency (default is 5)
-                language=None,        # Auto-detect language
+                language="en",        # Force English — eliminates 500ms language detection
+                                      # overhead and stops Hindi misdetections on accented speech.
+                                      # Change to None for multilingual support in Phase 3.
                 vad_filter=False,     # MUST be False: LiveKit sends RED-encoded audio which
                                       # Silero VAD misidentifies as silence, removing 100% of the
                                       # buffer. We do our own silence filtering via min_audio_ms.
