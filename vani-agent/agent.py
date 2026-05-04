@@ -130,6 +130,9 @@ async def entrypoint(ctx: JobContext) -> None:
     user_id = meta.get("userId", "")
     logger.info(f"Notebook: {notebook_id}, User: {user_id}")
 
+    # Connect immediately so the room does not time out while models warm up.
+    await ctx.connect()
+
     # Re-use a warm pipeline if available (reduces startup latency)
     if _pipeline is None:
         logger.info("Building pipeline (first job)...")
@@ -137,9 +140,6 @@ async def entrypoint(ctx: JobContext) -> None:
 
     pipeline = _pipeline
     pipeline.reset_history()   # Fresh conversation per session
-
-    # ── Connect agent to the room ────────────────────────────────────────
-    await ctx.connect()
 
     # Create an audio source to push TTS audio into the room
     sample_rate = pipeline.tts.sample_rate
