@@ -208,123 +208,105 @@ async def entrypoint(ctx: JobContext) -> None:
     ):
         nonlocal turn_index
         audio_stream = rtc.AudioStream(track)
-        buffer: list[np.ndarray] = []
-        # LiveKit decodes audio to PCM; codec artifacts and background noise produce
-        # RMS ~0.005-0.015 even in silence. Setting threshold at 0.03 reliably
-        # distinguishes actual speech from codec noise.
-        silence_threshold = 0.03       # RMS below this = silence
-        silence_frames = 0
-        speech_frames = 0              # Track how much speech we've seen
-        # 1200ms silence = end of utterance. Increased from 600ms to handle
-        # natural mid-sentence pauses (e.g. "machine learning... is a type of AI")
-        # At 20ms/frame: 60 frames × 20ms = 1200ms
-        silence_limit = 60             # ~1200ms of silence = end of utterance
 
-        # CRITICAL: LiveKit delivers audio at the track's native rate (Chrome = 48kHz).
-        # We must pass the real rate to WhisperASR._ensure_16khz() so it resamples
-        # to 16kHz before transcription. Without this, Whisper hears speech at 3× speed.
-        actual_sample_rate: int = 48000   # safe default; updated from first frame
-        min_audio_samples: int = int(actual_sample_rate * 1.5)  # 1.5s minimum
+        # ── Silero VAD — neural end-of-speech detection ──────────────────
+        # How Google/Apple/Amazon do it: a small neural model (~1MB) trained
+        # to understand speech acoustics, not just audio energy. It can
+        # distinguish a natural mid-sentence pause from actual silence.
+        # Key params:
+        #   min_silence_duration=1.2  → 1.2s of true silence = end of turn
+        #   min_speech_duration=0.2   → ignore noise bursts < 200ms
+        #   padding_duration=0.4      → include 400ms context before/after
+        from livekit.plugins import silero as _silero
+        from livekit.agents.vad import VADEventType
+
+        vad = _silero.VAD.load(
+            min_silence_duration=1.2,
+            min_speech_duration=0.2,
+            padding_duration=0.4,
+        )
+        vad_stream = vad.stream()
+        logger.info("Silero VAD ready (min_silence=1.2s).")
+
+        actual_sample_rate: int = 48000
         frame_inited = False
 
-        async for event in audio_stream:
-            frame: rtc.AudioFrame = event.frame
+        async def _feed_vad():
+            nonlocal actual_sample_rate, frame_inited
+            async for evt in audio_stream:
+                frame: rtc.AudioFrame = evt.frame
+                if not frame_inited:
+                    actual_sample_rate = frame.sample_rate
+                    logger.info(f"Audio stream: sample_rate={actual_sample_rate}Hz")
+                    frame_inited = True
+                vad_stream.push_frame(frame)
 
-            # Capture real sample rate on first frame
-            if not frame_inited:
-                actual_sample_rate = frame.sample_rate
-                min_audio_samples = int(actual_sample_rate * 1.5)
-                logger.info(
-                    f"Audio stream: sample_rate={actual_sample_rate}Hz, "
-                    f"min_clip={min_audio_samples/actual_sample_rate:.1f}s"
+        asyncio.ensure_future(_feed_vad())
+
+        async for vad_event in vad_stream:
+            if vad_event.type != VADEventType.END_OF_SPEECH:
+                continue
+            if not vad_event.frames:
+                continue
+
+            # Build float32 numpy array from the VAD-segmented frames
+            sr = vad_event.frames[0].sample_rate
+            audio_frames = np.concatenate([
+                np.frombuffer(f.data, dtype=np.int16).astype(np.float32) / 32768.0
+                for f in vad_event.frames
+            ])
+
+            # Skip clips under 1 second (too short for reliable ASR)
+            if len(audio_frames) < sr * 1.0:
+                logger.debug(f"Speech too short ({len(audio_frames)/sr*1000:.0f}ms) — skipping.")
+                continue
+
+            resolved_user_id = user_id or participant.identity
+            context = PipelineContext(
+                notebook_id=notebook_id,
+                user_id=resolved_user_id,
+                session_id=ctx.room.name,
+                turn_index=turn_index,
+            )
+            turn_index += 1
+            pipeline.interrupt()
+
+            async def push_audio(chunk: AudioChunk):
+                samples = chunk.samples.detach().cpu().numpy() if hasattr(chunk.samples, "detach") else np.asarray(chunk.samples)
+                samples_int16 = (samples * 32767).astype(np.int16)
+                lk_frame = rtc.AudioFrame(
+                    data=samples_int16.tobytes(),
+                    sample_rate=chunk.sample_rate,
+                    num_channels=1,
+                    samples_per_channel=len(samples_int16),
                 )
-                frame_inited = True
+                try:
+                    await audio_source.capture_frame(lk_frame)
+                except Exception:
+                    pass
 
-            # Convert to float32 numpy array
-            pcm = np.frombuffer(frame.data, dtype=np.int16).astype(np.float32) / 32768.0
+            async def send_transcript(user_text: str, agent_text: str):
+                import json
+                payload = json.dumps({"type": "transcript", "user": user_text, "agent": agent_text}).encode()
+                try:
+                    await ctx.room.local_participant.publish_data(payload, reliable=True)
+                except PublishDataError:
+                    pass
+                except Exception as e:
+                    logger.debug(f"Transcript send skipped: {e}")
 
-            rms = float(np.sqrt(np.mean(pcm ** 2)))
+            try:
+                await pipeline.process_turn(
+                    audio_frames=audio_frames,
+                    context=context,
+                    on_audio=push_audio,
+                    on_transcript=send_transcript,
+                    audio_sample_rate=sr,
+                )
+                logger.info(f"Turn {turn_index} done | TTFA={context.ttfa_ms:.0f}ms")
+            except Exception as e:
+                logger.error(f"Pipeline error on turn {turn_index}: {e}", exc_info=True)
 
-            if rms > silence_threshold:
-                buffer.append(pcm)
-                silence_frames = 0
-                speech_frames += 1
-            elif buffer:
-                silence_frames += 1
-                buffer.append(pcm)   # Include trailing silence for natural cut
-
-                if silence_frames >= silence_limit:
-                    # End of utterance — run a pipeline turn
-                    audio_frames = np.concatenate(buffer)
-                    buffer.clear()
-                    silence_frames = 0
-                    speech_frames = 0
-
-                    # Guard: skip clips too short for Whisper to transcribe reliably
-                    if len(audio_frames) < min_audio_samples:
-                        logger.debug(
-                            f"Audio too short ({len(audio_frames)/actual_sample_rate*1000:.0f}ms) — skipping."
-                        )
-                        continue
-
-
-                    resolved_user_id = user_id or participant.identity
-                    context = PipelineContext(
-                        notebook_id=notebook_id,
-                        user_id=resolved_user_id,
-                        session_id=ctx.room.name,
-                        turn_index=turn_index,
-                    )
-                    turn_index += 1
-
-                    # Signal barge-in if user speaks while agent is talking
-                    pipeline.interrupt()
-
-                    async def push_audio(chunk: AudioChunk):
-                        """Push a synthesized audio chunk into the room."""
-                        samples = chunk.samples.detach().cpu().numpy() if hasattr(chunk.samples, "detach") else np.asarray(chunk.samples)
-                        samples_int16 = (samples * 32767).astype(np.int16)
-                        lk_frame = rtc.AudioFrame(
-                            data=samples_int16.tobytes(),
-                            sample_rate=chunk.sample_rate,
-                            num_channels=1,
-                            samples_per_channel=len(samples_int16),
-                        )
-                        try:
-                            await audio_source.capture_frame(lk_frame)
-                        except Exception:
-                            pass  # Room may have closed mid-stream
-
-                    async def send_transcript(user_text: str, agent_text: str):
-                        """Send transcript to frontend via data channel."""
-                        import json
-                        payload = json.dumps({
-                            "type": "transcript",
-                            "user": user_text,
-                            "agent": agent_text,
-                        }).encode()
-                        try:
-                            await ctx.room.local_participant.publish_data(
-                                payload, reliable=True
-                            )
-                        except PublishDataError:
-                            pass  # Room closed before transcript could be sent
-                        except Exception as e:
-                            logger.debug(f"Transcript send skipped: {e}")
-
-                    try:
-                        await pipeline.process_turn(
-                            audio_frames=audio_frames,
-                            context=context,
-                            on_audio=push_audio,
-                            on_transcript=send_transcript,
-                            audio_sample_rate=actual_sample_rate,
-                        )
-                        logger.info(
-                            f"Turn {turn_index} done | TTFA={context.ttfa_ms:.0f}ms"
-                        )
-                    except Exception as e:
-                        logger.error(f"Pipeline error on turn {turn_index}: {e}", exc_info=True)
 
     # Keep the job alive until the room is empty
     @ctx.room.on("participant_disconnected")
