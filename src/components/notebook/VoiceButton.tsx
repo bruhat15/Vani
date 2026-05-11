@@ -130,10 +130,11 @@ const VoiceButton = () => {
   );
 
   const buttonClasses = {
-    idle: 'bg-[var(--color-navy)] border-[color:rgba(232,232,240,0.5)]',
+    idle: 'bg-slate-800 border-[color:rgba(232,232,240,0.35)] hover:bg-slate-700 hover:border-[color:rgba(232,232,240,0.6)] transition-colors',
     listening: 'bg-[var(--color-sage)] border-[color:rgba(245,240,232,0.65)]',
     speaking: 'bg-[var(--color-saffron)] border-[color:rgba(245,240,232,0.65)]',
   };
+
 
   return (
     <>
