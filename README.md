@@ -3,7 +3,7 @@
 
 Vani is a voice-first learning assistant for people who want to understand their own documents by talking through them. Upload a textbook chapter, research paper, meeting note, or PDF, then ask questions and get answers grounded in the material you provided, with citations that show where the answer came from. It is built for students, researchers, and professionals who think better in conversation than in search boxes.
 
-## How It Works
+## How It Works:
 
 ```mermaid
 flowchart TD
